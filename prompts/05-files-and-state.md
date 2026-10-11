@@ -61,6 +61,54 @@ One JSON object per line: source_id, canonical_work_id, title, authors_or_organi
 
 Use null for genuinely unavailable values, never invented placeholder scores. Do not include a utility_score field.
 
+## Validator contract
+
+`python scripts/validate_assessment.py RESULT.json` loads the sibling
+`evidence.jsonl` if present. `--evidence FILE.jsonl` overrides that location and
+requires the named file to exist. The Python API is
+`validate_report(report, evidence_records=None)`; pass a list of parsed records
+when sources have been registered. Nonzero evidence counts or venue citations
+without a ledger fail validation. An empty zero-source record does not require
+a ledger; a malformed ledger is never silently ignored.
+
+- All listed nested result fields are required. Confirmed or waived records need
+  a nonempty `confirmation.evidence_reference`. Awaiting records may use null.
+  This field may cite a message or a file in prose: validation establishes its
+  presence, not actual user consent, file existence, or the truth of a waiver.
+- A scored assessment needs nonempty rationale, novelty_delta, significance and
+  contribution_depth. For unscored incomplete records, these fields may be null
+  when unknown, but must remain present. Do not invent explanations to pass.
+- `idea_revision` and `run_id` use i/r plus at least three digits with a positive
+  number; sequences may exceed 999. Idea IDs follow the dated slug/hash naming
+  rule and use a valid calendar date. The shipped `synthetic-example` ID remains
+  allowed only when `evidence_summary.synthetic` is the Boolean true; other
+  `synthetic-<slug>` fixtures follow the same explicit exception.
+- `assessed_at` and source `accessed_at` use ISO-8601 date-times with seconds and
+  a timezone offset or Z. `preferred_venues` is an array of nonempty strings.
+  Venue records require name, track, fit, positioning, requirements and
+  source_ids. Track may be null; requirements and source_ids are string arrays.
+  Positioning is stretch / plausible target / more conservative target. Empty
+  source_ids do not verify a venue claim; disclose unavailable scope evidence.
+- Evidence records contain every field listed under Source record; unavailable
+  metadata may be null. Stable source_id, canonical_work_id, read_status and
+  accessed_at cannot be unknown. Duplicate source IDs or work families fail.
+  Every venue source ID must resolve to this ledger.
+- `evidence_summary.audited` and `fully_read` are required nonnegative integers
+  (booleans do not count as integers). They are cumulative unique registered
+  sources and the subset marked full, respectively, including reused sources.
+  Both must match the ledger, and fully_read cannot exceed audited.
+- Optional `newly_inspected` and `reused` are nonnegative counts that must match
+  the ledger when present. By default a source with reused_from=null is newly
+  inspected; a prior-run reference means reused without reinspection. A source
+  may explicitly set the optional Boolean `inspected_in_run` to record whether
+  it was actually inspected in this run, including reinspection of a prior
+  source. Reused means not inspected in this run for these summary counters;
+  both counters partition audited. Provenance stays in reused_from.
+
+This validator checks recorded consistency, not whether a claimed reading took
+place, whether a DOI resolves, or whether the research claims are true. Keep the
+independent review and completion checks below.
+
 ## Completion checks
 
 Check score range, IDs, confirmation or explicit waiver, source references, actual counts, and report/result agreement. Recompute gate from the recorded policy: all met gives GO, any not_met gives NO-GO, otherwise null; empty binding criteria gives awaiting_policy. Ensure missing implementation is not a failing criterion. Check that all reported agent runs actually occurred. Structural consistency does not certify scholarly truth.
